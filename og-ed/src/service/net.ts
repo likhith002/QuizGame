@@ -5,11 +5,12 @@ export enum PacketTypes{
   ShowQuestion,
   ChnageState,
   PlayerJoin,
-  StartGame
+  StartGame,
+  Tick
 }
 
 
-enum GameState{
+export enum GameState{
 
   Lobby,
   Play,
@@ -32,6 +33,10 @@ interface Player{
 export interface PlayerJoinPacket{
   player: Player
 
+}
+
+export interface TickPacket{
+  tick:number
 }
 
 export class NetService {

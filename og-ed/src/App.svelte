@@ -2,7 +2,7 @@
 
   import Button from "./lib/Button.svelte";
   import QuizCard from "./lib/QuizCard.svelte";
-  import { NetService, PacketTypes, type ChangeGameState, type PlayerJoinPacket } from "./service/net";
+  import { GameState, NetService, PacketTypes, type ChangeGameState, type PlayerJoinPacket, type TickPacket } from "./service/net";
   import type { Player, Quiz, QuizQuestion } from "./model/quiz";
 
   let quizzes: { _id: string; name: string }[] = [];
@@ -11,6 +11,7 @@
   let currentQuestion: QuizQuestion;
   let state=-1
   let host=false
+  let tick=0
   let players:Player[]=[]
   netService.connect();
   netService.onPacket((packet: any) => {
@@ -38,6 +39,11 @@
           let data=packet as PlayerJoinPacket;
           players=[...players,data.player]
           break
+        }
+      case PacketTypes.Tick:
+        {
+          let  data=packet as TickPacket
+          tick=data.tick
         }
     }
   });
@@ -106,7 +112,7 @@
     {/each}
   </div>
 {/if}
-{:else if state==0}
+{:else if state==GameState.Lobby}
 {#if host}
 <Button on:click={startGame}>Start Game</Button>
 <p>lobby state</p>
@@ -117,5 +123,21 @@
   {/each
 }
 
+{/if}
+{:else if state===GameState.Play}
+{#if host}
+Clock: {tick}
+{#if currentQuestion != null}
+  <h2 class="text-3xl font-bold mt-8">{currentQuestion.name}</h2>
+  <div class="flex">
+    {#each currentQuestion.choices as choice}
+      <div class="flex-1 bg-blue-400 text-center font-bold text-2xl">
+        {choice.name}
+      </div>
+    {/each}
+  </div>
+{/if}
+{:else}
+<p>Press correct answer</p>
 {/if}
 {/if}

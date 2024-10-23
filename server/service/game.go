@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"math/rand"
 	"og_ed/entity"
 	"strconv"
@@ -32,6 +31,7 @@ type Game struct {
 	CurrentQuestion int
 	Code            string
 	State           GameState
+	Time            int
 	Players         []Player
 	Host            *websocket.Conn
 	netService      *NetService
@@ -49,6 +49,7 @@ func NewGame(quiz entity.Quiz, host *websocket.Conn) Game {
 		Quiz:    quiz,
 		Code:    generateCode(),
 		Players: []Player{},
+		Time:    60,
 		State:   LobbyState,
 		Host:    host,
 	}
@@ -84,7 +85,10 @@ func (g *Game) Start() {
 }
 
 func (g *Game) Tick() {
-	fmt.Println("ticking....")
+
+	g.Time--
+	g.netService.SendPacket(g.Host, TickPacket{Tick: g.Time})
+
 }
 
 func (g *Game) ChangeGameState(state GameState) {

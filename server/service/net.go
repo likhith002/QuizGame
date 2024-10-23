@@ -47,6 +47,9 @@ type PlayerJoinPacket struct {
 }
 type StartGamePacket struct {
 }
+type TickPacket struct {
+	Tick int `json:"tick"`
+}
 
 func (c *NetService) getGameByCode(code string) *Game {
 
