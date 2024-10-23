@@ -75,10 +75,26 @@ func (g *Game) BroadCastPacket(packet any, includeHost bool) error {
 
 func (g *Game) Start() {
 	g.ChangeGameState(PlayState)
+	g.netService.SendPacket(g.Host, ShowQuestionPacket{
+		Question: entity.QuizQuestion{
+			Id:   "",
+			Name: "What is 2+2?",
+			Choices: []entity.QuizChoice{
+				{
+					Id:   "a",
+					Name: "4",
+				},
+				{
+					Id:   "b",
+					Name: "45",
+				},
+			},
+		},
+	})
 	go func() {
 		for {
 			g.Tick()
-			time.Sleep(time.Second * 2)
+			time.Sleep(time.Second * 1)
 		}
 
 	}()

@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -12,13 +11,13 @@ type Quiz struct {
 }
 
 type QuizQuestion struct {
-	Id      uuid.UUID    `json:"id"`
+	Id      string       `json:"id"`
 	Name    string       `json:"name"`
 	Choices []QuizChoice `json:"choices"`
 }
 
 type QuizChoice struct {
-	Id      uuid.UUID `json:"id"`
-	Name    string    `json:"name"`
-	Correct bool      `json:"correct"`
+	Id      string `json:"id"`
+	Name    string `json:"name"`
+	Correct bool   `json:"correct"`
 }

@@ -35,7 +35,7 @@ type HostGamePacket struct {
 }
 
 type ShowQuestionPacket struct {
-	Quetion entity.QuizQuestion `json:"question"`
+	Question entity.QuizQuestion `json:"question"`
 }
 
 type ChangeGameState struct {
@@ -103,6 +103,8 @@ func (c *NetService) packetToPacketId(packet interface{}) (uint8, error) {
 
 	case PlayerJoinPacket:
 		return 4, nil
+	case TickPacket:
+		return 6, nil
 	}
 
 	return 0, errors.New("invalid type provided")

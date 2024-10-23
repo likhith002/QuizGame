@@ -13,7 +13,9 @@
   let host=false
   let tick=0
   let players:Player[]=[]
-  netService.connect();
+  setTimeout(()=>{
+    netService.connect();
+  },500)
   netService.onPacket((packet: any) => {
 
     switch (packet.id) {
@@ -35,13 +37,14 @@
       
       case PacketTypes.PlayerJoin:
         {
-          console.log(packet)
+
           let data=packet as PlayerJoinPacket;
           players=[...players,data.player]
           break
         }
       case PacketTypes.Tick:
         {
+          
           let  data=packet as TickPacket
           tick=data.tick
         }
