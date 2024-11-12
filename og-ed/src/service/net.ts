@@ -20,9 +20,6 @@ export enum GameState{
 }
 
 
-export interface ChangeGameState{
-  state:GameState
-}
 
 interface Player{
   id:string
@@ -30,12 +27,25 @@ interface Player{
 
 }
 
-export interface PlayerJoinPacket{
+export interface Packet{
+  id:PacketTypes
+}
+
+export interface HostGamePacket extends Packet{
+  quizId:string
+}
+
+export interface ChangeGameState extends Packet{
+  state:GameState
+}
+
+
+export interface PlayerJoinPacket extends Packet{
   player: Player
 
 }
 
-export interface TickPacket{
+export interface TickPacket extends Packet{
   tick:number
 }
 
@@ -56,6 +66,10 @@ export class NetService {
       //   });
     };
 
+    this.webSocket.onclose=()=>{
+      console.log("Connection closed from server....")
+    }
+
     this.webSocket.onmessage = async (event: MessageEvent) => {
 
       const arrayBuffer = await event.data.arrayBuffer();
@@ -71,11 +85,13 @@ export class NetService {
     }
   }
 
-  onPacket(callback: (packet: any) => void) {
+  onPacket(callback: (packet: Packet) => void) {
     this.onPacketCallback = callback;
   }
 
-  sendPacket(packet: any) {
+  sendPacket(packet: Packet) {
+
+
     const pId: number = packet.id;
     const pIdArr = new Uint8Array([pId]);
     const packetData = JSON.stringify(packet, (key, val) =>
