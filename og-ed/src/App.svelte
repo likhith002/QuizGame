@@ -4,6 +4,9 @@
   import QuizCard from "./lib/QuizCard.svelte";
   import { GameState, NetService, PacketTypes, type ChangeGameState, type PlayerJoinPacket, type TickPacket } from "./service/net";
   import type { Player, Quiz, QuizQuestion } from "./model/quiz";
+  import PlayerView from "./views/player/PlayerView.svelte";
+  import HostView from "./views/host/HostView.svelte"
+  import Router from "svelte-spa-router";
 
   let quizzes: { _id: string; name: string }[] = [];
 
@@ -13,85 +16,92 @@
   let host=false
   let tick=0
   let players:Player[]=[]
-  setTimeout(()=>{
-    netService.connect();
-  },500)
-  netService.onPacket((packet: any) => {
+  // setTimeout(()=>{
+  //   netService.connect();
+  // },500)
+  // netService.onPacket((packet: any) => {
 
-    switch (packet.id) {
-      case 2: {
-        currentQuestion = packet.question;
-        break;
-      }
+  //   switch (packet.id) {
+  //     case 2: {
+  //       currentQuestion = packet.question;
+  //       break;
+  //     }
 
-      // change a packet to am aliased struct type with the custom interfaces 
+  //     // change a packet to am aliased struct type with the custom interfaces 
 
-      case PacketTypes.ChnageState:
-        {
-            let data=packet as ChangeGameState
-            console.log(data.state);
-            state=data.state
+  //     case PacketTypes.ChnageState:
+  //       {
+  //           let data=packet as ChangeGameState
+  //           console.log(data.state);
+  //           state=data.state
 
-            break;
-        }
+  //           break;
+  //       }
       
-      case PacketTypes.PlayerJoin:
-        {
+  //     case PacketTypes.PlayerJoin:
+  //       {
 
-          let data=packet as PlayerJoinPacket;
-          players=[...players,data.player]
-          break
-        }
-      case PacketTypes.Tick:
-        {
+  //         let data=packet as PlayerJoinPacket;
+  //         players=[...players,data.player]
+  //         break
+  //       }
+  //     case PacketTypes.Tick:
+  //       {
           
-          let  data=packet as TickPacket
-          tick=data.tick
-        }
-    }
-  });
+  //         let  data=packet as TickPacket
+  //         tick=data.tick
+  //       }
+  //   }
+  // });
   let code = "";
   let name=""
-  async function getQuizes() {
-    try {
-      const response = await fetch("http://localhost:5001/api/quizzes");
+  
+  // async function getQuizes() {
+  //   try {
+  //     const response = await fetch("http://localhost:5001/api/quizzes");
 
-      let json = await response.json();
-      console.log(json);
-      quizzes = json;
-    } catch (error) {
-      console.log("Error",error);
-    }
-  }
+  //     let json = await response.json();
+  //     console.log(json);
+  //     quizzes = json;
+  //   } catch (error) {
+  //     console.log("Error",error);
+  //   }
+  // }
 
-  function connect() {
-   netService.sendPacket({
-    id:0,
-    code:code,
-    name:name
-   })
+  // function connect() {
+  //  netService.sendPacket({
+  //   id:0,
+  //   code:code,
+  //   name:name
+  //  })
 
 
-  }
-  // default mode for entering
+  // }
+  // // default mode for entering
 
-  function hostQuiz(quiz: Quiz) {
-    host=true
-    netService.sendPacket({
-      id: 1,
-      quiz_id: quiz.id,
-    });
-  }
+  // function hostQuiz(quiz: Quiz) {
+  //   host=true
+  //   netService.sendPacket({
+  //     id: 1,
+  //     quiz_id: quiz.id,
+  //   });
+  // }
 
-  function startGame(){
+  // function startGame(){
 
-    netService.sendPacket({
-      id:PacketTypes.StartGame
-    })
+  //   netService.sendPacket({
+  //     id:PacketTypes.StartGame
+  //   })
 
+  // }
+
+  let routes={
+    '/':PlayerView,
+    '/host':HostView
   }
 </script>
-{#if state==-1}
+<Router {routes}/>
+<!-- {#if state==-1}
 <Button on:click={getQuizes}>Get Quizes</Button>
 
 <div>
@@ -143,4 +153,4 @@ Clock: {tick}
 {:else}
 <p>Press correct answer</p>
 {/if}
-{/if}
+{/if} -->

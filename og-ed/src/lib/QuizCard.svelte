@@ -1,15 +1,16 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
   import Button from "./Button.svelte";
+  import type { Quiz } from "../model/quiz";
   // import type { Quiz } from "../model/quiz";
   // import { push } from "svelte-spa-router";
 
   const dispatch = createEventDispatcher();
 
-  export let quiz: { _id: string; name: string };
-
+  export let quiz: Quiz
   function host() {
     dispatch("host", quiz);
+
   }
 
   // function edit() {
