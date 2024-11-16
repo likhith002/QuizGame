@@ -31,7 +31,7 @@ type ConnectionPacket struct {
 }
 
 type HostGamePacket struct {
-	QuizId string `json:"quiz_id"`
+	QuizId string `json:"quizId"`
 }
 
 type ShowQuestionPacket struct {
@@ -130,7 +130,6 @@ func (c *NetService) OnIncomingMessage(conn *websocket.Conn, mt int, msg []byte)
 	}
 
 	switch data := packet.(type) {
-
 	case *ConnectionPacket:
 		{
 
@@ -148,11 +147,13 @@ func (c *NetService) OnIncomingMessage(conn *websocket.Conn, mt int, msg []byte)
 
 	case *HostGamePacket:
 		{
+			fmt.Println("RECVD", data)
 
 			quizId, err := primitive.ObjectIDFromHex(data.QuizId)
 
 			if err != nil {
 				fmt.Println(err)
+
 				return
 			}
 
@@ -167,6 +168,7 @@ func (c *NetService) OnIncomingMessage(conn *websocket.Conn, mt int, msg []byte)
 
 				return
 			}
+
 			newGame := NewGame(*quiz, conn)
 			fmt.Println("Code for New Game", newGame.Code)
 			c.games = append(c.games, &newGame)
