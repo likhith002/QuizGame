@@ -28,7 +28,7 @@ func (c *WebsocketController) Ws(conn *websocket.Conn) {
 		if mt, msg, err = conn.ReadMessage(); err != nil {
 			log.Panicln("read", err)
 			// fmt.Print(err)
-			break
+			continue
 		}
 
 		c.netService.OnIncomingMessage(conn, mt, msg)
