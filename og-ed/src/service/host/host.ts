@@ -8,7 +8,6 @@ export const gameState:Writable<GameState>=writable(GameState.Lobby)
 export class HostGame{
     private net:NetService;
 
-
     constructor(){
         this.net=new NetService();
         this.net.connect()
@@ -24,8 +23,12 @@ export class HostGame{
         }
 
         this.net.sendPacket(packet)
+    }
 
-
+    start(){
+        this.net.sendPacket({
+            id:PacketTypes.StartGame
+        })
 
     }
 

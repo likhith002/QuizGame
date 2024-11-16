@@ -1,7 +1,11 @@
 <script lang="ts">
+  import App from "../../App.svelte";
   import type { Quiz } from "../../model/quiz";
   import { HostGame,gameState } from "../../service/host/host";
+  import { GameState } from "../../service/net";
   import HostListView from "./HostListView.svelte";
+  import HostLobby from "./HostLobby.svelte";
+  import HostPlay from "./HostPlay.svelte";
    
  let game= new HostGame()
  
@@ -9,10 +13,14 @@
  let active=false 
  function onHost(event:CustomEvent){
     const quiz:Quiz=event.detail
-    console.log(event)
     game.hostQuiz(quiz.id)
     active=true
 
+}
+
+let views:Record<GameState,any>={
+    [GameState.Lobby]:HostLobby,
+    [GameState.Play]:HostPlay
 }
 
 
@@ -22,7 +30,7 @@
 
 <div>
     {#if active}
-        <p>{$gameState}</p>
+        <svelte:component this={views[$gameState]} {game}/>
     {:else}
     <HostListView on:host={onHost}/>
         
