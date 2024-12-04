@@ -4,17 +4,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"og_ed/entity"
+	"time"
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2/log"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+const MAX_PLAYERS = 6
+
 type NetService struct {
 	quizService *QuizService
 	games       []*Game
-	host        *websocket.Conn
 	tick        int
 }
 
@@ -26,7 +29,6 @@ func Net(quizService *QuizService) *NetService {
 }
 
 type ConnectionPacket struct {
-	Code string `json:"code"`
 	Name string `json:"name"`
 }
 
@@ -43,23 +45,69 @@ type ChangeGameState struct {
 }
 
 type PlayerJoinPacket struct {
-	Player Player `json:"player"`
+	Player   Player `json:"player"`
+	GameCode string `json:"gameCode"`
 }
 type StartGamePacket struct {
 }
 type TickPacket struct {
 	Tick int `json:"tick"`
 }
+type GameSettings struct {
+	Coordinates []CoordinatesPacket `json:"coordinates"`
+	Players     []Player            `json:"players"`
+}
 
-func (c *NetService) getGameByCode(code string) *Game {
+type CoordinatesPacket struct {
+	X1        float32 `json:"x1"`
+	Y1        float32 `json:"y1"`
+	X2        float32 `json:"x2"`
+	Y2        float32 `json:"y2"`
+	Color     string  `json:"color"`
+	LineWidth string  `json:"lineWidth"`
+}
 
-	for _, game := range c.games {
+func getRandomIndex(arr []*Game) (int, error) {
+	// Check if the array is empty
+	if len(arr) == 0 {
+		return -1, fmt.Errorf("array is empty")
+	}
 
-		if game.Code == code {
-			return game
+	var randomIndex int
+	for {
+		rand.Seed(time.Now().UnixNano())
+
+		randomIndex = rand.Intn(len(arr))
+
+		if len(arr[randomIndex].Players) != MAX_PLAYERS {
+			return randomIndex, nil
+
 		}
 
 	}
+
+}
+
+func (c *NetService) addToGame(conn *websocket.Conn, name string) *Game {
+
+	index, _ := getRandomIndex(c.games)
+
+	if index == -1 {
+		newGame := NewGame(conn)
+		c.games = append(c.games, &newGame)
+		newGame.OnPlayerAdd(name, conn)
+
+	} else {
+		return c.games[index]
+	}
+
+	// for _, game := range c.games {
+
+	// 	if game.Code == code {
+	// 		return game
+	// 	}
+
+	// }
 	return nil
 }
 
@@ -75,6 +123,20 @@ func (c *NetService) getGameByHost(host *websocket.Conn) *Game {
 	return nil
 }
 
+func (c *NetService) getGameByConn(conn *websocket.Conn) *Game {
+
+	for _, game := range c.games {
+
+		if _, flag := game.PlayerConn[conn.IP()]; flag {
+			return game
+		}
+
+	}
+
+	return nil
+
+}
+
 func (c *NetService) packetIdToPacket(pid uint8) interface{} {
 
 	switch pid {
@@ -86,6 +148,9 @@ func (c *NetService) packetIdToPacket(pid uint8) interface{} {
 
 	case 5:
 		return &StartGamePacket{}
+
+	case 7:
+		return &CoordinatesPacket{}
 	}
 
 	return nil
@@ -105,6 +170,16 @@ func (c *NetService) packetToPacketId(packet interface{}) (uint8, error) {
 		return 4, nil
 	case TickPacket:
 		return 6, nil
+
+	case CoordinatesPacket:
+		return 7, nil
+	case GameSettings:
+		return 8, nil
+
+	}
+
+	if k, ok := packet.(CoordinatesPacket); ok {
+		fmt.Println(k, "TE")
 	}
 
 	return 0, errors.New("invalid type provided")
@@ -121,19 +196,20 @@ func (c *NetService) OnIncomingMessage(conn *websocket.Conn, mt int, msg []byte)
 	data := msg[1:]
 
 	packet := c.packetIdToPacket(pId)
-	// fmt.Println(pId, string(data))
+
 	err := json.Unmarshal(data, packet)
 
 	if err != nil {
 
 		log.Fatal(err)
+
 	}
 
 	switch data := packet.(type) {
 	case *ConnectionPacket:
 		{
 
-			game := c.getGameByCode(data.Code)
+			game := c.addToGame(conn, data.Name)
 
 			if game == nil {
 				return
@@ -141,36 +217,40 @@ func (c *NetService) OnIncomingMessage(conn *websocket.Conn, mt int, msg []byte)
 
 			game.OnPlayerAdd(data.Name, conn)
 
+			if len(game.Players) == 1 && game.State == LobbyState {
+				c.SendPacket(conn, ChangeGameState{
+					State: game.State,
+				})
+
+			} else {
+
+				game.Start()
+			}
+
 			// fmt.Println(data.Name, "wants to join game", data.Code)
 			break
 		}
 
 	case *HostGamePacket:
 		{
-			fmt.Println("RECVD", data)
 
-			quizId, err := primitive.ObjectIDFromHex(data.QuizId)
-
-			if err != nil {
-				fmt.Println(err)
-
-				return
-			}
-
-			quiz, err := c.quizService.quizCollection.GetById(quizId)
+			_, err := primitive.ObjectIDFromHex(data.QuizId)
 
 			if err != nil {
 				fmt.Println(err)
-				return
-			}
-
-			if quiz == nil {
 
 				return
 			}
 
-			newGame := NewGame(*quiz, conn)
-			fmt.Println("Code for New Game", newGame.Code)
+			// quiz, err := c.quizService.quizCollection.GetById(quizId)
+
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			newGame := NewGame(conn)
+			// fmt.Println("Code for New Game", newGame.Code)
 			c.games = append(c.games, &newGame)
 
 			c.SendPacket(conn, ChangeGameState{
@@ -188,6 +268,29 @@ func (c *NetService) OnIncomingMessage(conn *websocket.Conn, mt int, msg []byte)
 			}
 			game.Start()
 			return
+		}
+
+	case *CoordinatesPacket:
+		{
+
+			game := c.getGameByConn(conn)
+
+			if game == nil {
+				return
+			}
+
+			game.Coordinates = append(game.Coordinates, *data)
+
+			err = game.BroadCastPacket(*data, true)
+
+			if err != nil {
+				log.Fatal("Failed in broadcasting...", err)
+			}
+		}
+	default:
+		{
+
+			fmt.Println(pId, data)
 		}
 	}
 
@@ -251,6 +354,7 @@ func (c *NetService) PacketToBytes(packet interface{}) ([]byte, error) {
 func (c *NetService) SendPacket(conn *websocket.Conn, packet interface{}) error {
 
 	bytes, err := c.PacketToBytes(packet)
+
 	if err != nil {
 
 		return err
