@@ -1,106 +1,41 @@
 <script lang="ts">
 
-  import Button from "./lib/Button.svelte";
-  import QuizCard from "./lib/QuizCard.svelte";
-  import { GameState, NetService, PacketTypes, type ChangeGameState, type PlayerJoinPacket, type TickPacket } from "./service/net";
-  import type { Player, Quiz, QuizQuestion } from "./model/quiz";
   import PlayerView from "./views/player/PlayerView.svelte";
   import HostView from "./views/host/HostView.svelte"
   import Router from "svelte-spa-router";
+  import NotFound from "./views/NotFound.svelte";
 
-  let quizzes: { _id: string; name: string }[] = [];
-
-  let netService = new NetService();
-  let currentQuestion: QuizQuestion;
-  let state=-1
-  let host=false
-  let tick=0
-  let players:Player[]=[]
-  // setTimeout(()=>{
-  //   netService.connect();
-  // },500)
-  // netService.onPacket((packet: any) => {
-
-  //   switch (packet.id) {
-  //     case 2: {
-  //       currentQuestion = packet.question;
-  //       break;
-  //     }
-
-  //     // change a packet to am aliased struct type with the custom interfaces 
-
-  //     case PacketTypes.ChnageState:
-  //       {
-  //           let data=packet as ChangeGameState
-  //           console.log(data.state);
-  //           state=data.state
-
-  //           break;
-  //       }
-      
-  //     case PacketTypes.PlayerJoin:
-  //       {
-
-  //         let data=packet as PlayerJoinPacket;
-  //         players=[...players,data.player]
-  //         break
-  //       }
-  //     case PacketTypes.Tick:
-  //       {
-          
-  //         let  data=packet as TickPacket
-  //         tick=data.tick
-  //       }
-  //   }
-  // });
-  let code = "";
-  let name=""
-  
-  // async function getQuizes() {
-  //   try {
-  //     const response = await fetch("http://localhost:5001/api/quizzes");
-
-  //     let json = await response.json();
-  //     console.log(json);
-  //     quizzes = json;
-  //   } catch (error) {
-  //     console.log("Error",error);
-  //   }
-  // }
-
-  // function connect() {
-  //  netService.sendPacket({
-  //   id:0,
-  //   code:code,
-  //   name:name
-  //  })
-
-
-  // }
-  // // default mode for entering
-
-  // function hostQuiz(quiz: Quiz) {
-  //   host=true
-  //   netService.sendPacket({
-  //     id: 1,
-  //     quiz_id: quiz.id,
-  //   });
-  // }
-
-  // function startGame(){
-
-  //   netService.sendPacket({
-  //     id:PacketTypes.StartGame
-  //   })
-
-  // }
 
   let routes={
-    '/':PlayerView,
-    '/host':HostView
+    '/play':PlayerView,
+    '/host':HostView,
+    "*" :NotFound
   }
 </script>
-<Router {routes}/>
+<div class="w-screen h-screen flex flex-col bg-gray-50 m-0 pb-2">
+  <div class="w-full h-[70px] z-50 sticky top-0 bg-white shadow-md items-center flex px-2 justify-between">
+    <div class="w-[50px] h-[50px] border-[0.5px] rounded-full bg-blue-200 justify-center items-center flex">Logo</div>
+    <div class="flex-1 items-center justify-center flex">
+    <h1 class="text-3xl font-bold">
+      Scribble
+    </h1>
+    
+    </div>
+  </div>
+  <div class="flex  flex-col w-full h-full">
+    <!-- <div class="w-[10%] bg-white h-full z-40 shadow-sm">sidebar</div> -->
+    <div class="flex flex-col flex-1 bg-gray-200">
+      <Router {routes}/>
+    </div>
+    <div class="w-full h-[70px] z-50 sticky top-0 bg-white shadow-md items-center flex px-2 justify-center">....</div>
+
+  
+  </div>
+  
+
+
+</div>
+
 <!-- {#if state==-1}
 <Button on:click={getQuizes}>Get Quizes</Button>
 
