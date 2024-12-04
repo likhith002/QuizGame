@@ -1,24 +1,14 @@
 <script lang="ts">
-  import { PlayerGame } from "../../service/player/player";
-  import PlayerJoin from "./PlayerJoin.svelte";
+  import { push } from "svelte-spa-router";
+  import { state } from "../../service/player/player";
 
+  import PlayerPlay from "./PlayerPlay.svelte";
 
-let game=new PlayerGame();
-let active=false
-
-function onjoin(){
-    active=true
-}
-
+  if (!$state) {
+    push("/host");
+  }
 </script>
 
 <div>
-{#if active}
-    active
-{:else}
-    <PlayerJoin on:join={onjoin} game={game}/>
-    
-{/if}
+  <PlayerPlay />
 </div>
-
-
