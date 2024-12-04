@@ -2,7 +2,6 @@ package service
 
 import (
 	"math/rand"
-	"og_ed/entity"
 	"strconv"
 	"time"
 
@@ -13,6 +12,8 @@ import (
 type Player struct {
 	Id         uuid.UUID       `json:"id"`
 	Name       string          `json:"name"`
+	Points     int             `json:"ponts"`
+	ProfilePic string          `json:"profile"`
 	Connection *websocket.Conn `json:"-"`
 }
 
@@ -26,15 +27,18 @@ const (
 )
 
 type Game struct {
-	Id              uuid.UUID
-	Quiz            entity.Quiz
-	CurrentQuestion int
-	Code            string
-	State           GameState
-	Time            int
-	Players         []Player
-	Host            *websocket.Conn
-	netService      *NetService
+	Id            uuid.UUID
+	CurrentWord   string
+	Code          string
+	State         GameState
+	Time          int
+	Players       []Player
+	Coordinates   []CoordinatesPacket
+	PlayerConn    map[string]uuid.UUID
+	CurrentPlayer Player
+	Rounds        int
+	Host          *websocket.Conn
+	netService    *NetService
 }
 
 func generateCode() string {
@@ -42,25 +46,29 @@ func generateCode() string {
 
 }
 
-func NewGame(quiz entity.Quiz, host *websocket.Conn) Game {
+func NewGame(host *websocket.Conn) Game {
 
 	return Game{
-		Id:      uuid.New(),
-		Quiz:    quiz,
-		Code:    generateCode(),
-		Players: []Player{},
-		Time:    60,
-		State:   LobbyState,
-		Host:    host,
+		Id:          uuid.New(),
+		Code:        generateCode(),
+		PlayerConn:  make(map[string]uuid.UUID),
+		Players:     []Player{},
+		Coordinates: []CoordinatesPacket{},
+		Time:        60,
+		State:       LobbyState,
+		Host:        host,
 	}
 }
 
 func (g *Game) BroadCastPacket(packet any, includeHost bool) error {
 
 	for _, player := range g.Players {
-		err := g.netService.SendPacket(player.Connection, packet)
-		if err != nil {
-			return err
+		if player.Connection != g.Host {
+
+			err := g.netService.SendPacket(player.Connection, packet)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	if includeHost {
@@ -75,25 +83,17 @@ func (g *Game) BroadCastPacket(packet any, includeHost bool) error {
 
 func (g *Game) Start() {
 	g.ChangeGameState(PlayState)
-	g.netService.SendPacket(g.Host, ShowQuestionPacket{
-		Question: entity.QuizQuestion{
-			Id:   "",
-			Name: "What is 2+2?",
-			Choices: []entity.QuizChoice{
-				{
-					Id:   "a",
-					Name: "4",
-				},
-				{
-					Id:   "b",
-					Name: "45",
-				},
-			},
-		},
-	})
+
+	// Select a player to be the
+
 	go func() {
 		for {
+
+			if g.Time == 0 {
+				break
+			}
 			g.Tick()
+
 			time.Sleep(time.Second * 1)
 		}
 
@@ -119,16 +119,27 @@ func (g *Game) OnPlayerAdd(name string, conn *websocket.Conn) {
 
 	player := Player{
 		Id:         uuid.New(),
+		Points:     0,
 		Name:       name,
 		Connection: conn,
 	}
 	g.Players = append(g.Players, player)
+	g.PlayerConn[conn.IP()] = player.Id
 
 	g.netService.SendPacket(conn, ChangeGameState{
 		State: g.State,
 	})
 
-	g.netService.SendPacket(g.Host, PlayerJoinPacket{
-		Player: player,
+	g.netService.SendPacket(conn, PlayerJoinPacket{
+		Player:   player,
+		GameCode: g.Code,
 	})
+
+	go func() {
+		time.Sleep(time.Second * 2)
+		g.netService.SendPacket(conn, GameSettings{
+			Coordinates: g.Coordinates,
+			Players:     g.Players,
+		})
+	}()
 }
