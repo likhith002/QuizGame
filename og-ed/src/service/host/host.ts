@@ -4,13 +4,14 @@ import type { Player } from "../../model/quiz";
 
 
 export const players:Writable<Player[]>=writable([])
-export const gameState:Writable<GameState>=writable(GameState.Lobby)
+export const gameState:Writable<GameState>=writable()
+export const gameCode:Writable<string>=writable("")
 export class HostGame{
     private net:NetService;
 
     constructor(){
-        this.net=new NetService();
-        this.net.connect()
+        this.net=NetService.getInstance()
+
         this.net.onPacket(p=>this.onPacket(p))
 
     }
@@ -38,13 +39,13 @@ export class HostGame{
 
             case PacketTypes.PlayerJoin:
                 {
-
                     let data=packet as PlayerJoinPacket
                     players.update((p)=>[...p,data.player])
+                    gameCode.set(data.gameCode)
                     break
                 }
 
-            case PacketTypes.ChnageState:
+            case PacketTypes.ChangeState:
                 {
                     let data=packet as ChangeGameState
                     gameState.set(data.state)
