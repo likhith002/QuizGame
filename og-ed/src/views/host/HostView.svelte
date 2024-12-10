@@ -3,22 +3,28 @@
   import * as Card from "$lib/components/ui/card/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import { Label } from "$lib/components/ui/label/index.js";
-  import { push } from "svelte-spa-router";
-  import { PlayerGame, state } from "../../service/player/player";
-  import { GameState } from "../../service/net";
+  import {
+    PacketTypes,
+    state,
+    type ChangeGameState,
+    type NetService,
+    type Packet,
+  } from "../../service/net";
 
-  let game = new PlayerGame();
+  export let netService: NetService;
+
+  netService.onPacket((packet: Packet) => {
+    switch (packet.id) {
+      case PacketTypes.ChangeState: {
+        let data = packet as ChangeGameState;
+        state.set(data.state);
+        break;
+      }
+    }
+  });
 
   function joinGame() {
-    game.join("Player1");
-  }
-
-  console.log("Current state", $state);
-
-  $: if ($state == GameState.Lobby) {
-    console.log("Player Added");
-  } else if ($state == GameState.Play) {
-    push("/play");
+    netService.join("Player1");
   }
 </script>
 

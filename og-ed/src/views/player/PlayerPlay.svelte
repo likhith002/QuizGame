@@ -1,25 +1,48 @@
 <script lang="ts">
   import {
+    currentPlayer,
+    gameState,
+    GameState,
     NetService,
     PacketTypes,
+    players,
+    player,
+    type ChangeGameState,
+    type ChooseWordPacket,
     type DrawPoint,
     type GameSettingsPacket,
+    type Player,
   } from "../../service/net";
   import { onMount } from "svelte";
+
   let canvas: HTMLCanvasElement;
   let ctx: CanvasRenderingContext2D;
   let colorPicker: HTMLInputElement;
   let lineWidthInput: HTMLInputElement;
   let fillBtn: HTMLButtonElement;
-
+  let pointerEvents: boolean;
   let isDrawing = false;
   let lastX = 0;
   let lastY = 0;
-  let netService: NetService = NetService.getInstance();
-  netService.onPacket((packet) => {
-    console.log("PACKET ID", packet.id);
+  export let netService: NetService;
 
+  // const gameCode: Writable<string> = writable("");
+
+  netService.onPacket((packet) => {
     switch (packet.id) {
+      case PacketTypes.ChangeState: {
+        let data = packet as ChangeGameState;
+        gameState.set(data.state);
+
+        if (data.state == GameState.UpdatePlayer) {
+          const currPlayer = data.payload.player as Player;
+          currentPlayer.set(currPlayer);
+          if ($player.id) pointerEvents = currPlayer.id == $player.id;
+        }
+
+        break;
+      }
+
       case PacketTypes.Coordinates: {
         const data = packet as DrawPoint;
         drawLine(
@@ -36,16 +59,28 @@
       case PacketTypes.GameSettings: {
         const data = packet as GameSettingsPacket;
 
-        for (const point of data.coordinates) {
-          drawLine(
-            point.x1,
-            point.y1,
-            point.x2,
-            point.y2,
-            point.color,
-            point.lineWidth
-          );
+        players.update((prev) => [...prev, ...data.players]);
+
+        if (data.player) pointerEvents = data.player.id == $player.id;
+        if (data?.coordinates) {
+          for (const point of data.coordinates) {
+            drawLine(
+              point.x1,
+              point.y1,
+              point.x2,
+              point.y2,
+              point.color,
+              point.lineWidth
+            );
+          }
         }
+        break;
+      }
+      case PacketTypes.ChooseWord: {
+        const data = packet as ChooseWordPacket;
+
+        console.log("Choosing words....", data.words);
+
         break;
       }
     }
@@ -161,7 +196,9 @@
   }
 </script>
 
-<div class="h-screen w-screen p-20">
+<div
+  class={`h-screen w-screen p-20 ${pointerEvents ? "pointer-events-auto" : "pointer-events-none"}`}
+>
   <div class="flex flex-col w-full h-full justify-center items-center">
     <canvas
       bind:this={canvas}

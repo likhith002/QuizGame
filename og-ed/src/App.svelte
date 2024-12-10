@@ -1,14 +1,15 @@
 <script lang="ts">
 
-  import PlayerView from "./views/player/PlayerView.svelte";
-  import HostView from "./views/host/HostView.svelte"
+
   import Router from "svelte-spa-router";
   import NotFound from "./views/NotFound.svelte";
+  import Dashboard from "./views/Dashboard/Dashboard.svelte";
 
 
   let routes={
-    '/play':PlayerView,
-    '/host':HostView,
+    '/':Dashboard,
+    // '/play':PlayerView,
+    // '/host':HostView,
     "*" :NotFound
   }
 </script>

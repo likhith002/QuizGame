@@ -16,7 +16,7 @@
   correct: boolean;
 }
 
- export interface Player {
+ interface Player {
   id: string;
   name: string;
 }

@@ -1,5 +1,7 @@
+import { writable, type Writable } from "svelte/store";
+import { PlayerGame } from "./player/player";
 
-export enum PacketTypes{
+export enum PacketTypes {
   Connect,
   Host,
   ShowQuestion,
@@ -8,76 +10,77 @@ export enum PacketTypes{
   StartGame,
   Tick,
   Coordinates,
-  GameSettings
+  GameSettings,
+  ChooseWord,
 }
 
-
-export enum GameState{
+export enum GameState {
   Lobby,
   Play,
+  UpdatePlayer,
   Reveal,
-  End
- 
+  End,
 }
 
-
-
-
-
-
-interface Player{
-  id:string
-  name:string
-
+export interface Player {
+  id: string;
+  name: string;
+  points: number;
+  profile?: string;
 }
 
-
-
-export interface Packet{
-  id:PacketTypes
+export interface Packet {
+  id: PacketTypes;
 }
 
-
-
-export interface HostGamePacket extends Packet{
-  quizId:string
+export interface HostGamePacket extends Packet {
+  quizId: string;
 }
 
-export interface ChangeGameState extends Packet{
-  state:GameState
+export interface ChangeGameState extends Packet {
+  state: GameState;
+  payload: any;
 }
 
-
-export interface PlayerJoinPacket extends Packet{
-  player: Player
-  gameCode:string
-
+export interface PlayerJoinPacket extends Packet {
+  player: Player;
+  gameCode: string;
 }
 
-export interface TickPacket extends Packet{
-  tick:number
+export interface TickPacket extends Packet {
+  tick: number;
 }
 
-export interface GameSettingsPacket extends Packet{
-  players:Player[]
-  coordinates:DrawPoint[]
+export interface GameSettingsPacket extends Packet {
+  players: Player[];
+  coordinates: DrawPoint[];
+  player: Player;
 }
 
-export interface DrawPoint extends Packet{
-  x1 :number    
-	y1 :number    
-	x2 :number   
-	y2 : number    
-	color :string 
-	lineWidth:string 
-
+export interface ChooseWordPacket extends Packet {
+  words: string[];
 }
 
+export interface DrawPoint extends Packet {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color: string;
+  lineWidth: string;
+}
+
+export const state: Writable<GameState> = writable();
+export const players: Writable<Player[]> = writable([]);
+export const player: Writable<Player> = writable();
+export const currentPlayer: Writable<Player> = writable();
+export const gameState: Writable<GameState> = writable();
 export class NetService {
   private webSocket!: WebSocket;
   private textDecoder: TextDecoder = new TextDecoder();
   private textEncoder: TextEncoder = new TextEncoder();
-  private onPacketCallback?: (packet: any) => void;
+  private onPacketCallbacks: Array<(packet: any) => void> = [];
+  private playerGame: PlayerGame = new PlayerGame();
   private static instance: NetService;
   connect() {
     this.webSocket = new WebSocket("ws://localhost:5001/ws");
@@ -90,43 +93,50 @@ export class NetService {
       //   });
     };
 
-    this.webSocket.onclose=()=>{
-      console.log("Connection closed from server....")
-    }
+    this.webSocket.onclose = () => {
+      console.log("Connection closed from server....");
+    };
 
     this.webSocket.onmessage = async (event: MessageEvent) => {
-
-
       const arrayBuffer = await event.data.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
       const pId = bytes[0];
 
       const packet = JSON.parse(this.textDecoder.decode(bytes.subarray(1)));
-      packet.id=pId
-      if (this.onPacketCallback) {
-        console.log("Received packet",packet)
-        this.onPacketCallback(packet);
+      packet.id = pId;
+
+      if (pId == PacketTypes.PlayerJoin) {
+        const playerPacket = packet as PlayerJoinPacket;
+        this.playerGame.joinPlayer(playerPacket.player);
       }
 
-    }
+      if (this.onPacketCallbacks.length > 0) {
+        this.onPacketCallbacks.forEach((callback) => callback(packet));
+      }
+    };
   }
 
+  join(name: string) {
+    let packet = {
+      id: PacketTypes.Connect,
+      name: name,
+    };
+    this.sendPacket(packet);
+  }
   public static getInstance(): NetService {
     // If the instance does not exist, create one
     if (!NetService.instance) {
       NetService.instance = new NetService();
-      this.instance.connect()
+      this.instance.connect();
     }
     return NetService.instance;
   }
 
   onPacket(callback: (packet: Packet) => void) {
-    this.onPacketCallback = callback;
+    this.onPacketCallbacks.push(callback);
   }
 
   sendPacket(packet: Packet) {
-
-
     const pId: number = packet.id;
     const pIdArr = new Uint8Array([pId]);
     const packetData = JSON.stringify(packet, (key, val) =>
