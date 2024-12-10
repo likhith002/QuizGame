@@ -27,7 +27,6 @@ func (c *WebsocketController) Ws(conn *websocket.Conn) {
 	for {
 		if mt, msg, err = conn.ReadMessage(); err != nil {
 			log.Panicln("read", err)
-			// fmt.Print(err)
 			continue
 		}
 
