@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"og_ed/internal/logger"
 	"og_ed/internal/utility"
 	"sort"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 type Player struct {
@@ -30,9 +32,12 @@ const (
 	PlayState
 	UpdatePlayerState
 	WaitState
+	UpdateLevelState
 	RevealState
 	EndState
 )
+const LEVEL_TIME int = 10
+const TOTAL_LEVELS int = 1
 
 type Game struct {
 	Id            uuid.UUID
@@ -45,10 +50,10 @@ type Game struct {
 	PlayerConn    map[string]uuid.UUID
 	CurrentPlayer *Player
 	GeneratedSets *map[string]struct{}
-	levels        int32
+	levels        int
 	Host          *websocket.Conn
 	netService    *NetService
-	brodcastChan  chan struct{}
+	logger        *logrus.Logger
 }
 
 func generateCode() string {
@@ -65,11 +70,12 @@ func NewGame(host *websocket.Conn, netService *NetService) Game {
 		Players:       make([]*Player, 0),
 		netService:    netService,
 		Coordinates:   []CoordinatesPacket{},
-		Time:          60,
-		levels:        3,
+		Time:          LEVEL_TIME,
+		levels:        TOTAL_LEVELS,
 		State:         LobbyState,
 		Host:          host,
 		GeneratedSets: &map[string]struct{}{},
+		logger:        logger.GetLogger(),
 	}
 }
 
@@ -88,39 +94,27 @@ func (g *Game) BroadCastPacket(packet any, excludePlayers map[*websocket.Conn]st
 	return nil
 }
 
-func (g *Game) loop() {
+// func (g *Game) loop() {
 
-	for {
+// 	for {
 
-		select {
+// 		select {
 
-		case data := <-g.brodcastChan:
-			{
-				fmt.Println("DD", data)
-			}
+// 		case data := <-g.brodcastChan:
+// 			{
+// 				fmt.Println("DD", data)
+// 			}
 
-		}
+// 		}
 
-	}
+// 	}
 
-}
-
-func (g *Game) startNewLevel() {
-
-	//Update the current player
-
-	g.CurrentPlayer = g.Players[0]
-
-	time.Sleep(time.Second * 2)
-
-	g.nextWord()
-
-}
+// }
 
 func (g *Game) startGame() error {
 
 	if len(g.Players) > 0 {
-		g.startNewLevel()
+		g.nextWord()
 	} else {
 		return fmt.Errorf("no players present in game")
 	}
@@ -129,27 +123,43 @@ func (g *Game) startGame() error {
 
 func (g *Game) resetGame() {
 
-
-	g.levels = 3
-
 	for _, player := range g.Players {
 
 		player.Points = 0
 		player.isWordChoosen = false
 	}
+	g.GeneratedSets = nil
+
+	g.levels = TOTAL_LEVELS
+	time.Sleep(time.Second * 3)
+	g.Time = LEVEL_TIME
 
 }
 
-func (g *Game) resetLevel() {
+func (g *Game) resetLevel() int {
 
+	g.levels = g.levels - 1
 
-	g.levels = g.levels-1
+	g.freezeLevel()
+
+	if g.levels == 0 {
+		return 0
+	}
 
 	for _, player := range g.Players {
 		player.isWordChoosen = false
 	}
-	/////
-	go cms
+
+	g.BroadCastPacket(ChangeGameStatePacket{
+		State: UpdateLevelState,
+		Payload: struct {
+			Level int `json:"level"`
+		}{
+			Level: TOTAL_LEVELS - g.levels + 1,
+		},
+	}, nil)
+
+	return 1
 
 }
 
@@ -171,10 +181,25 @@ func (g *Game) nextWord() {
 	mu.Lock()
 	defer mu.Unlock()
 
-	go g.Tick()
-
-	g.Time = 60
+	g.Time = LEVEL_TIME
+	g.Coordinates = []CoordinatesPacket{}
 	nextPlayer := g.getNextPlayer()
+
+	if nextPlayer == nil {
+
+		fmt.Println("Calling reset level")
+		status := g.resetLevel()
+
+		if status == 0 {
+			g.resetGame()
+			return
+		} else {
+
+			nextPlayer = g.getNextPlayer()
+
+		}
+
+	}
 
 	nextPlayer.isWordChoosen = true
 
@@ -193,7 +218,7 @@ func (g *Game) nextWord() {
 			Words: utility.GenerateUniqueRandomWords(g.GeneratedSets),
 		},
 	)
-
+	g.logger.Info("Choosing a word")
 	g.BroadCastPacket(ChangeGameStatePacket{
 		State: WaitState,
 		Payload: struct {
@@ -201,7 +226,9 @@ func (g *Game) nextWord() {
 		}{
 			fmt.Sprintf("%s is choosing a word....", g.CurrentPlayer.Name),
 		},
-	}, nil)
+	}, map[*websocket.Conn]struct{}{
+		nextPlayer.Connection: {},
+	})
 }
 
 func sortMapByValue(players []*Player) []*Player {
@@ -218,47 +245,58 @@ func sortMapByValue(players []*Player) []*Player {
 func (g *Game) processResult() {
 
 	//sort the map by Points
+	var levelType string = "intermediate"
+	if g.levels == 0 {
+		levelType = "final"
+	}
 
 	g.BroadCastPacket(LevelResult{
 		Result: g.dereferencePlayers(sortMapByValue(g.Players)),
+		Type:   levelType,
 	}, nil)
 
 }
 
+func (g *Game) freezeLevel() {
+	g.processResult()
+
+}
+
 func (g *Game) Start() {
-	g.ChangeGameState(PlayState, struct{}{})
+	// g.ChangeGameState(PlayState, struct{}{})
 
 	if err := g.startGame(); err != nil {
 		log.Fatal(err)
 	}
 
-	go g.loop()
+	// go g.loop()
 
 	go func() {
 		for {
 
-			if g.levels == 0 {
-				g.resetGame()
-
-			}
-
 			if g.Time == 0 {
-				g.processResult()
+
+				g.logger.Info("Freezing the level")
 				g.nextWord()
-				g.Time = 60
 
 			}
 
-			time.Sleep(time.Second * 1)
+			time.Sleep(time.Second * 5)
 		}
 	}()
 }
 
 func (g *Game) Tick() {
 
-	g.Time--
+	for {
 
-	g.BroadCastPacket(TickPacket{Tick: g.Time}, nil)
+		if g.Time == 0 {
+			break
+		}
+		g.Time--
+		time.Sleep(time.Second)
+		g.BroadCastPacket(TickPacket{Tick: g.Time}, nil)
+	}
 
 }
 
@@ -304,12 +342,14 @@ func (g *Game) OnPlayerAdd(name string, conn *websocket.Conn) {
 	})
 
 	go func() {
-		time.Sleep(time.Second * 2)
-		g.netService.SendPacket(conn, GameSettings{
+		time.Sleep(time.Second * 3)
+
+		g.BroadCastPacket(GameSettings{
 			Coordinates:   g.Coordinates,
 			Players:       g.dereferencePlayers(g.Players),
 			CurrentPlayer: g.CurrentPlayer,
-		})
+		}, nil)
+
 	}()
 
 }

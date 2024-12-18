@@ -55,13 +55,14 @@ type StartGamePacket struct {
 
 type LevelResult struct {
 	Result []Player `json:"result"`
+	Type   string   `json:"type"`
 }
 
 type TickPacket struct {
 	Tick int `json:"tick"`
 }
 type GameSettings struct {
-	Coordinates   []CoordinatesPacket `json:"coordinates,omitempty"`
+	Coordinates   []CoordinatesPacket `json:"coordinates"`
 	Players       []Player            `json:"players"`
 	CurrentPlayer *Player             `json:"currentPlayer,omitempty"`
 }
@@ -77,6 +78,10 @@ type CoordinatesPacket struct {
 
 type ChooseWord struct {
 	Words []string `json:"words"`
+}
+
+type SelectedWordPacket struct {
+	Woerd string `json:"word"`
 }
 
 func getRandomIndex(arr []*Game) (int, error) {
@@ -155,6 +160,8 @@ func (c *NetService) packetIdToPacket(pid uint8) interface{} {
 
 	case 7:
 		return &CoordinatesPacket{}
+	case 10:
+		return &SelectedWordPacket{}
 	}
 
 	return nil
@@ -274,6 +281,8 @@ func (c *NetService) OnIncomingMessage(conn *websocket.Conn, mt int, msg []byte)
 				return
 			}
 
+			fmt.Println("Got coordinates packet")
+
 			game.Coordinates = append(game.Coordinates, *data)
 
 			err = game.BroadCastPacket(*data, nil)
@@ -281,6 +290,27 @@ func (c *NetService) OnIncomingMessage(conn *websocket.Conn, mt int, msg []byte)
 			if err != nil {
 				log.Fatal("Failed in broadcasting...", err)
 			}
+		}
+	case *SelectedWordPacket:
+		{
+
+			game := c.getGameByConn(conn)
+
+			if game == nil {
+				return
+			}
+			game.BroadCastPacket(ChangeGameStatePacket{
+				State: PlayState,
+			}, nil)
+			time.Sleep(time.Second * 2)
+			game.BroadCastPacket(GameSettings{
+				Coordinates:   game.Coordinates,
+				Players:       game.dereferencePlayers(game.Players),
+				CurrentPlayer: game.CurrentPlayer,
+			}, nil)
+
+			go game.Tick()
+
 		}
 	default:
 		{
