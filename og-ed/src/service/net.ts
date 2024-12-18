@@ -12,12 +12,16 @@ export enum PacketTypes {
   Coordinates,
   GameSettings,
   ChooseWord,
+  SelectedWord,
+  LevelResult,
+  PlayerExit,
 }
 
 export enum GameState {
   Lobby,
   Play,
   UpdatePlayer,
+  Wait,
   Reveal,
   End,
 }
@@ -54,11 +58,14 @@ export interface TickPacket extends Packet {
 export interface GameSettingsPacket extends Packet {
   players: Player[];
   coordinates: DrawPoint[];
-  player: Player;
+  currentPlayer: Player;
 }
 
 export interface ChooseWordPacket extends Packet {
   words: string[];
+}
+export interface SelectedWord extends Packet {
+  word: string;
 }
 
 export interface DrawPoint extends Packet {
@@ -68,6 +75,11 @@ export interface DrawPoint extends Packet {
   y2: number;
   color: string;
   lineWidth: string;
+}
+
+export interface ResultPacket extends Packet {
+  result: Player[];
+  type: string;
 }
 
 export const state: Writable<GameState> = writable();
@@ -108,12 +120,28 @@ export class NetService {
       if (pId == PacketTypes.PlayerJoin) {
         const playerPacket = packet as PlayerJoinPacket;
         this.playerGame.joinPlayer(playerPacket.player);
+      } else if (pId == PacketTypes.ChangeState) {
+        const gameStatePacket = packet as ChangeGameState;
+        state.set(gameStatePacket.state);
+
+        if (gameStatePacket.state == GameState.UpdatePlayer) {
+          const currPlayer = gameStatePacket.payload.player as Player;
+          currentPlayer.set(currPlayer);
+        }
       }
+
+      console.log("received", packet);
 
       if (this.onPacketCallbacks.length > 0) {
         this.onPacketCallbacks.forEach((callback) => callback(packet));
       }
     };
+  }
+
+  close() {
+    this.sendPacket({
+      id: PacketTypes.PlayerExit,
+    });
   }
 
   join(name: string) {

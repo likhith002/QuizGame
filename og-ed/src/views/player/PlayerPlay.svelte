@@ -1,92 +1,31 @@
 <script lang="ts">
   import {
-    currentPlayer,
-    gameState,
-    GameState,
     NetService,
     PacketTypes,
-    players,
-    player,
-    type ChangeGameState,
-    type ChooseWordPacket,
     type DrawPoint,
-    type GameSettingsPacket,
-    type Player,
   } from "../../service/net";
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
 
   let canvas: HTMLCanvasElement;
   let ctx: CanvasRenderingContext2D;
   let colorPicker: HTMLInputElement;
   let lineWidthInput: HTMLInputElement;
   let fillBtn: HTMLButtonElement;
-  let pointerEvents: boolean;
   let isDrawing = false;
   let lastX = 0;
   let lastY = 0;
+  export let pointerEvents: boolean;
   export let netService: NetService;
+  export let exposeMethods;
+
+  $: if (exposeMethods) {
+    exposeMethods({ drawLine,resetCanvas });
+  }
 
   // const gameCode: Writable<string> = writable("");
 
-  netService.onPacket((packet) => {
-    switch (packet.id) {
-      case PacketTypes.ChangeState: {
-        let data = packet as ChangeGameState;
-        gameState.set(data.state);
-
-        if (data.state == GameState.UpdatePlayer) {
-          const currPlayer = data.payload.player as Player;
-          currentPlayer.set(currPlayer);
-          if ($player.id) pointerEvents = currPlayer.id == $player.id;
-        }
-
-        break;
-      }
-
-      case PacketTypes.Coordinates: {
-        const data = packet as DrawPoint;
-        drawLine(
-          data.x1,
-          data.y1,
-          data.x2,
-          data.y2,
-          data.color,
-          data.lineWidth
-        );
-        break;
-      }
-
-      case PacketTypes.GameSettings: {
-        const data = packet as GameSettingsPacket;
-
-        players.update((prev) => [...prev, ...data.players]);
-
-        if (data.player) pointerEvents = data.player.id == $player.id;
-        if (data?.coordinates) {
-          for (const point of data.coordinates) {
-            drawLine(
-              point.x1,
-              point.y1,
-              point.x2,
-              point.y2,
-              point.color,
-              point.lineWidth
-            );
-          }
-        }
-        break;
-      }
-      case PacketTypes.ChooseWord: {
-        const data = packet as ChooseWordPacket;
-
-        console.log("Choosing words....", data.words);
-
-        break;
-      }
-    }
-
-    // const  const data cordPacket = packet as DrawPoint;
-    // const data = cordPacket;
+  onDestroy(() => {
+    console.log("Destroying player view...");
   });
 
   onMount(() => {
@@ -131,6 +70,7 @@
           id: PacketTypes.Coordinates,
           ...message,
         };
+        console.log("Sending packet");
         netService.sendPacket(packet);
       });
 
@@ -141,7 +81,15 @@
 
       canvas.addEventListener("mousemove", draw);
     }
+
+    console.log("View got mounted...");
   });
+
+  function resetCanvas() {
+    if (ctx && canvas) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  }
 
   // Drawing function to send data to the server and draw locally
   function draw(e: MouseEvent) {
@@ -177,7 +125,7 @@
   }
 
   // Helper function to draw the line on canvas
-  function drawLine(
+  export function drawLine(
     x1: number,
     y1: number,
     x2: number,
